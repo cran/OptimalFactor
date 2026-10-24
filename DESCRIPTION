@@ -1,0 +1,48 @@
+Package: OptimalFactor
+Type: Package
+Title: Item Selection in Factor Analysis by Boosting and Specification
+        Search
+Version: 1.5.0
+Date: 2026-10-05
+Authors@R: 
+    person("Jose", "Ventura-Leon",
+           email = "jventuraleon@gmail.com",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-2996-4244"))
+Description: Provides an iterative optimization algorithm for exploratory
+    and confirmatory factor analysis that follows a boosting approach
+    inspired by machine learning. It uses a composite fit index whose
+    weights adapt to the degrees of freedom and the sample size, following
+    Kenny and McCoach (2003) <doi:10.1207/S15328007SEM1003_1> and Shi, Lee
+    and Maydeu-Olivares (2019) <doi:10.1177/0013164418783530>. It detects
+    and removes problematic items (Heywood cases, cross-loadings, low
+    loadings) with greedy or global search strategies, checks interfactor
+    correlations, and supports ordinal data with WLSMV estimation and
+    several rotation methods. A heuristic specification search for
+    confirmatory models (MacCallum, 1986 <doi:10.1037/0033-2909.100.1.107>)
+    explores move, drop and covariance operations across seed
+    configurations. It also evaluates the resampling stability of the item
+    selection, the recovery of a known or theoretical structure, and offers
+    an optional conceptual analysis of removed items through a large
+    language model service.
+License: GPL (>= 3)
+URL: https://github.com/jventural/OptimalFactor,
+        https://jventural.github.io/OptimalFactor/
+BugReports: https://github.com/jventural/OptimalFactor/issues
+Encoding: UTF-8
+LazyData: true
+Depends: R (>= 4.0.0)
+Imports: lavaan, psych, dplyr, tidyr, ggplot2, stringr, parallel,
+        stats, utils
+Suggests: testthat (>= 3.0.0), httr, jsonlite, R.utils, knitr,
+        rmarkdown, semTools
+RoxygenNote: 7.3.2
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+NeedsCompilation: no
+Packaged: 2026-10-15 17:35:48 UTC; PC
+Author: Jose Ventura-Leon [aut, cre] (ORCID:
+    <https://orcid.org/0000-0003-2996-4244>)
+Maintainer: Jose Ventura-Leon <jventuraleon@gmail.com>
+Repository: CRAN
+Date/Publication: 2026-10-24 16:30:08 UTC

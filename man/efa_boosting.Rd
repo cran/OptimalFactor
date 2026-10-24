@@ -1,0 +1,320 @@
+\name{efa_boosting}
+\alias{efa_boosting}
+\title{EFA-Boosting Optimization}
+
+\description{
+Performs an iterative, machine-learning-inspired optimization of Exploratory Factor Analysis (EFA).
+
+The algorithm integrates:
+(1) greedy item-by-item elimination,
+(2) optional global subset search (multi-item removal),
+(3) structural rule enforcement (loadings, Heywood / near-Heywood, cross-loadings, minimum items per factor),
+(4) adaptive minimum interfactor correlation checks, and
+(5) a composite fit index whose weights adapt dynamically to degrees of freedom \emph{and} sample size (df x N), following Kenny and McCoach (2003) and Shi, Lee and Maydeu-Olivares (2019).
+
+The function handles ordinal data (WLSMV) and includes robust corrections, adaptive weighting rules, and an optional GPT-based conceptual analysis of removed (and optionally retained) items.
+
+When \code{verbose = TRUE}, the function prints a complete
+\emph{EFA-Boosting Optimization Summary Report} including:
+
+(a) iteration diagnostics (RMSEA, SRMR, CFI, df, composite loss),
+(b) identification and elimination of structural problems,
+(c) global-search progress bars and decisions,
+(d) thresholded final structure,
+(e) interfactor-correlation compliance check, and
+(f) AI-based conceptual interpretations.
+
+Returns a complete list of results invisibly.
+}
+
+\usage{
+efa_boosting(
+  data,
+  name_items,
+  item_range = NULL,
+  n_factors = 3,
+  n_sample = NULL,
+  exclude_items = NULL,
+  thresholds = list(loading = 0.3, min_items_per_factor = 3,
+    heywood_tol = 1e-06, near_heywood = 0.015,
+    min_interfactor_correlation = 0.32, min_omega = NULL),
+  model_config = list(estimator = "WLSMV", rotation = "oblimin"),
+  performance = list(max_candidates_eval = 12, smart_pruning = TRUE,
+    timeout_efa = 30, timeout_optimization = 120, use_timeouts = FALSE,
+    emit_progress = TRUE, fit_target_only = TRUE),
+  use_global = FALSE,
+  global_opt = list(max_drop = 2, max_global_combinations = 5000,
+    verbose = TRUE, progress_bar = TRUE),
+  fit_config = list(targets = list(rmsea = 0.08, srmr = 0.06, cfi = 0.95),
+    margins = list(rmsea = 0.03, srmr = 0.03, cfi = 0.03),
+    base_weights = list(rmsea = 0.5, srmr = 0.25, cfi = 0.25),
+    small_df_cut = 5,
+    small_df_weights = list(rmsea = 0.15, srmr = 0.45, cfi = 0.4),
+    wlsmv_boost = list(rmsea = 0.8, srmr = 1.2, cfi = 1.1),
+    use_pclose_if_available = TRUE, pclose_bonus = 0.1),
+  use_ai_analysis = FALSE,
+  ai_config = list(api_key = NULL, generate_names = FALSE,
+    only_removed = TRUE, gpt_model = "gpt-3.5-turbo", language = "english",
+    analysis_detail = "detailed", domain_name = "Default Domain",
+    scale_title = "Default Scale Title", construct_definition = "",
+    model_name = "EFA Model", item_definitions = NULL),
+  verbose = TRUE,
+  ...
+)
+}
+
+\arguments{
+
+\item{data}{Data frame of item responses.}
+
+\item{name_items}{
+Item prefix (e.g., \code{"IT"} produces IT1, IT2, ...). Used for auto-detection.
+}
+
+\item{item_range}{
+Integer vector \code{c(start, end)}.
+If \code{NULL}, items are auto-detected.
+}
+
+\item{n_factors}{Number of factors.}
+
+\item{n_sample}{
+Sample size.
+If \code{NULL}, auto-detected as \code{nrow(data)}.
+Used for df x N adaptive weighting of the composite fit index.
+}
+
+\item{exclude_items}{Items excluded before starting optimization.}
+
+\item{thresholds}{
+Rules governing structural decisions:
+\itemize{
+  \item \code{loading}: Minimum acceptable loading.
+  \item \code{min_items_per_factor}: Structural protection rule.
+  \item \code{heywood_tol}, \code{near_heywood}: Detection thresholds.
+  \item \code{min_interfactor_correlation}: Minimum acceptable factor correlation.
+  \item \code{min_omega}: Reliability floor. When set (e.g. \code{0.80}), an item is
+    removed only if every factor keeps McDonald's omega at or above this value, so
+    the algorithm cannot buy fit at the cost of internal consistency. Omega is a
+    guard rail here, never a term in the loss: reliability is only interpretable
+    once the model fits, so it vetoes individual removals instead of competing with
+    the fit indices. A factor that already sits below the floor is not frozen -
+    its effective bar becomes its current omega, so removals that do not reduce
+    reliability are still allowed. Heywood cases are exempt, since an inadmissible
+    solution must be fixed regardless. \code{NULL} (default) disables the check and
+    reproduces the behaviour of versions prior to 1.3.0 exactly.
+}
+}
+
+\item{model_config}{
+EFA estimation configuration:
+\itemize{
+  \item \code{estimator = "WLSMV"}
+  \item \code{rotation  = "oblimin"}
+}
+}
+
+\item{performance}{
+Performance and timeout settings:
+\itemize{
+  \item \code{max_candidates_eval}: If set, only this many candidates are evaluated in greedy mode.
+  \item \code{timeout_efa}: Timeout per EFA run (requires \code{R.utils}).
+  \item \code{timeout_optimization}: Global timeout.
+  \item \code{use_timeouts}: Enable/disable timeout protection.
+  \item \code{smart_pruning}: Rank candidates by smallest maximum loading
+    before applying \code{max_candidates_eval}, so the items most likely to be
+    removed are the ones evaluated.
+  \item \code{emit_progress}: Emit a \code{message()} per iteration and per
+    candidate, which is what lets a Shiny app show live progress.
+  \item \code{fit_target_only}: Fit only the \code{n_factors} solution while
+    evaluating a candidate (default \code{TRUE}). The engine used to fit the
+    1..k-1 solutions as well and discard them, since candidate evaluation reads
+    only the target one. Results are identical, verified on
+    \code{Data_Personality} and \code{Data_Expectativas} across structure,
+    removed items, stop reason, RMSEA, omega and the fit table, with 38 percent
+    fewer lavaan fits where the greedy loop evaluates candidates.
+    \code{FALSE} restores the previous behaviour.
+}
+}
+
+\item{use_global}{
+Enable global subset search (multi-item removal).
+}
+
+\item{global_opt}{
+Configuration for global search:
+\itemize{
+  \item \code{max_drop}: Maximum subset size \emph{k}.
+  \item \code{max_global_combinations}: Hard cap to avoid explosion.
+  \item \code{verbose}: Print global-search diagnostics.
+  \item \code{progress_bar}: Show a visual progress bar.
+}
+}
+
+\item{fit_config}{
+Configuration of the adaptive composite fit index:
+\itemize{
+  \item \code{targets}: Target values for RMSEA, SRMR, CFI.
+  \item \code{margins}: Tolerances for each index.
+  \item \code{base_weights}: Default RMSEA/SRMR/CFI weights.
+  \item \code{critical_weights}: df < 5 and N < 200 (RMSEA nearly useless).
+  \item \code{df_low_n_high_weights}: df < 5 and N >= 200.
+  \item \code{df_mid_n_low_weights}: df 5-19 and N < 200.
+  \item \code{df_mid_n_high_weights}: df 5-19 and N >= 200.
+  \item \code{critical_df_cut}, \code{moderate_df_cut}: df boundaries.
+  \item \code{small_n_cut}: N-boundary for weighting.
+  \item \code{wlsmv_boost}: Multiplicative corrections for WLSMV.
+  \item \code{use_pclose_if_available}: Enables p-close bonus.
+  \item \code{pclose_bonus}: Amount subtracted from composite loss.
+}
+}
+
+\item{use_ai_analysis}{
+Enable GPT-based conceptual analysis of removed (and optionally retained) items.
+}
+
+\item{ai_config}{
+AI analysis configuration:
+\itemize{
+  \item \code{api_key}: OpenAI API key.
+  \item \code{gpt_model}: Model (e.g., \code{"gpt-4"}, \code{"gpt-3.5-turbo"}).
+  \item \code{language}: "spanish" or "english".
+  \item \code{analysis_detail}: "brief", "standard", "detailed".
+  \item \code{domain_name}, \code{scale_title}, \code{model_name}: Metadata included in prompts.
+  \item \code{construct_definition}: Theoretical definition of the latent construct.
+  \item \code{item_definitions}: Named list with item wording.
+  \item \code{only_removed}: If FALSE, retained items are also analyzed.
+}
+}
+
+\item{verbose}{
+If TRUE, prints the full diagnostic report, global-search bars, item maps,
+interfactor-correlation warnings, and AI progress bars.
+}
+
+\item{...}{Additional arguments passed to internal estimation routines.}
+
+}
+
+\details{
+
+\strong{1. Optimization strategy.}
+
+The algorithm follows a strict hierarchical rule system:
+\itemize{
+  \item Remove Heywood items (\eqn{\psi} < -tol or |loading| > 1).
+  \item Remove near-Heywood items (\eqn{\psi} ~ 0).
+  \item Resolve cross-loadings by removing items with smallest ambiguity gap.
+  \item Enforce minimum items per factor.
+  \item If structure is acceptable but RMSEA > target: remove the weakest-loading item.
+  \item If \code{use_global = TRUE}: evaluate all subsets up to \code{max_drop} using the composite loss.
+}
+
+\strong{2. Adaptive composite loss (df x N).}
+
+Weights for RMSEA / SRMR / CFI adapt dynamically according to:
+\itemize{
+  \item degrees of freedom (df),
+  \item sample size (N),
+  \item estimator (WLSMV boosters),
+  \item p-close >= .05 (bonus).
+}
+
+This allows stable decisions even when RMSEA is unreliable (df < 5).
+
+\strong{3. Interfactor correlation rule.}
+
+After each iteration and at finalization, factor correlations are checked:
+\itemize{
+  \item If any \eqn{|\phi_{ij}|} < \code{min_interfactor_correlation}, a warning is printed.
+}
+
+\strong{4. Global subset search.}
+
+If enabled:
+\itemize{
+  \item evaluates all subsets of size 1 ... k,
+  \item uses safe-combination caps,
+  \item shows a progress bar,
+  \item accepts subset removals only if composite loss strictly improves.
+}
+
+\strong{5. AI conceptual analysis.}
+
+If \code{use_ai_analysis = TRUE}:
+\itemize{
+  \item removed items receive a narrative justification using
+        loadings, ambiguity gaps, h^2, \eqn{\psi}, RMSEA-at-removal, and algorithmic reason,
+  \item retained items can also be evaluated,
+  \item exponential-backoff retry logic ensures robustness,
+  \item a detailed elimination timeline is integrated into the prompt.
+}
+
+}
+
+\value{
+A list containing:
+\itemize{
+  \item \code{final_structure}: Thresholded loading matrix.
+  \item \code{removed_items}: Items removed (in chronological order).
+  \item \code{steps_log}: Full elimination log with the following columns:
+    \itemize{
+      \item \code{step}: Iteration number
+      \item \code{removed_item}: Name of the removed item
+      \item \code{reason}: Reason for removal
+      \item \code{rmsea}: RMSEA value at the moment of removal (scaled when WLSMV is used)
+      \item \code{srmr}: SRMR value at the moment of removal
+      \item \code{cfi}: CFI value at the moment of removal (scaled when WLSMV is used)
+    }
+  \item \code{iterations}: Number of optimization iterations.
+  \item \code{final_rmsea}: Final RMSEA.
+  \item \code{bondades_original}: Fit indices from the final model.
+  \item \code{stop_reason}: Why the loop ended (\code{"all_criteria_met"},
+    \code{"min_items_per_factor_protected"}, \code{"min_omega_protected"},
+    \code{"fit_target_reached"}, \code{"max_iterations"}, \code{"not_enough_items"},
+    \code{"timeout"}, \code{"efa_convergence_failed"},
+    \code{"fit_zero_no_structural_problem"}).
+  \item \code{inter_factor_correlation}: Final phi matrix.
+  \item \code{interfactor_check}: Information about violations.
+  \item \code{omega_final}: McDonald's omega per factor in the final solution,
+    computed from the primary loadings of the pattern matrix. Always reported,
+    whether or not the floor is active.
+  \item \code{omega_check}: The floor in force, whether it was met, and
+    \code{blocked_items} (items the floor kept from being removed).
+  \item \code{last_h2}, \code{last_psi}: Final communalities and uniquenesses.
+  \item \code{last_flags}: Heywood and near-Heywood indicators.
+  \item \code{conceptual_analysis}: GPT-based narrative analyses.
+  \item \code{config_used}: Full configuration list.
+}
+}
+
+\examples{
+\donttest{
+data(Data_Personality)
+res <- efa_boosting(
+  data       = Data_Personality,
+  name_items = "PPTQ",
+  n_factors  = 3,
+  verbose    = TRUE
+)
+res$removed_items
+res$final_structure
+}
+}
+
+\references{
+Kenny, D. A., & McCoach, D. B. (2003). Effect of the number of variables on
+measures of fit in structural equation modeling. \emph{Structural Equation
+Modeling, 10}(3), 333-351. \doi{10.1207/S15328007SEM1003_1}
+
+Shi, D., Lee, T., & Maydeu-Olivares, A. (2019). Understanding the model size
+effect on SEM fit indices. \emph{Educational and Psychological Measurement,
+79}(2), 310-334. \doi{10.1177/0013164418783530}
+}
+
+\seealso{
+\code{\link{print_conceptual_analysis}},
+\code{\link{export_conceptual_analysis}}
+}
+
+\encoding{UTF-8}
