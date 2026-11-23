@@ -9,20 +9,19 @@ knitr::opts_chunk$set(
 # if (!require("devtools")) {
 #   install.packages("devtools")
 # }
-# devtools::install_github("jventural/OptimalFactor")
+# devtools::install_github("jventural/OptimalFactor", dependencies = TRUE)
 
 ## -----------------------------------------------------------------------------
 # library(OptimalFactor)
 # 
 # # Run EFA-Boosting
 # result <- efa_boosting(
-#   data = your_data,
-#   name_items = "item",
-#   n_factors = 3,
-#   verbose = TRUE
+#   data = Data_Personality,
+#   name_items = "PPTQ",
+#   n_factors = 3
 # )
 # 
 # # View results
 # print(result$final_structure)
-# print(result$fit_indices)
+# print(result$bondades_original)
 

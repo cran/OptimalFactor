@@ -353,7 +353,7 @@ inspired boosting algorithms.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">require</span>(<span class="st">&quot;devtools&quot;</span>)) {</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>  <span class="fu">install.packages</span>(<span class="st">&quot;devtools&quot;</span>)</span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>}</span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;jventural/OptimalFactor&quot;</span>)</span></code></pre></div>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>devtools<span class="sc">::</span><span class="fu">install_github</span>(<span class="st">&quot;jventural/OptimalFactor&quot;</span>, <span class="at">dependencies =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 </div>
 <div id="main-features" class="section level2">
 <h2>Main Features</h2>
@@ -371,8 +371,8 @@ detection</li>
 <li><strong>Cross-loading identification</strong> and removal</li>
 <li><strong>Minimum items per factor</strong> enforcement</li>
 <li><strong>Interfactor correlation verification</strong></li>
-<li><strong>Optional AI-assisted conceptual analysis</strong> via GPT
-models</li>
+<li><strong>Optional AI-assisted conceptual analysis</strong> via a
+language model</li>
 </ul>
 </div>
 <div id="cfa-optimization" class="section level3">
@@ -394,15 +394,14 @@ optimization:</p>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># Run EFA-Boosting</span></span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">efa_boosting</span>(</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">data =</span> your_data,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;item&quot;</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">3</span>,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>)</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co"># View results</span></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">print</span>(result<span class="sc">$</span>final_structure)</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="fu">print</span>(result<span class="sc">$</span>fit_indices)</span></code></pre></div>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">data =</span> Data_Personality,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;PPTQ&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">3</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>)</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co"># View results</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="fu">print</span>(result<span class="sc">$</span>final_structure)</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="fu">print</span>(result<span class="sc">$</span>bondades_original)</span></code></pre></div>
 </div>
 </div>
 <div id="theoretical-background" class="section level2">

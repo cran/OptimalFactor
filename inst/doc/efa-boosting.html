@@ -405,51 +405,60 @@ iterations exceeded - No improvement possible</p>
 <h2>Usage Examples</h2>
 <div id="basic-usage" class="section level3">
 <h3>Basic Usage</h3>
+<p>Items must be named with a common prefix and a number
+(<code>PPTQ1</code>, <code>PPTQ2</code>, …).</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(OptimalFactor)</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">efa_boosting</span>(</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="at">data =</span> Data_Personality,</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;item&quot;</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">5</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;PPTQ&quot;</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">3</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="advanced-configuration" class="section level3">
 <h3>Advanced Configuration</h3>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">efa_boosting</span>(</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="at">data =</span> Data_Personality,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;item&quot;</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">5</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">rotation =</span> <span class="st">&quot;oblimin&quot;</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">target_RMSEA =</span> <span class="fl">0.05</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">target_SRMR =</span> <span class="fl">0.05</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="at">target_CFI =</span> <span class="fl">0.95</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">min_loading =</span> <span class="fl">0.40</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  <span class="at">cross_loading_threshold =</span> <span class="fl">0.32</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>  <span class="at">min_items_per_factor =</span> <span class="dv">3</span>,</span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>  <span class="at">global_search =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>  <span class="at">global_max_remove =</span> <span class="dv">3</span>,</span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;PPTQ&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">3</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="at">thresholds =</span> <span class="fu">list</span>(<span class="at">loading =</span> <span class="fl">0.40</span>, <span class="at">min_items_per_factor =</span> <span class="dv">3</span>, <span class="at">min_omega =</span> <span class="fl">0.60</span>),</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>  <span class="at">model_config =</span> <span class="fu">list</span>(<span class="at">estimator =</span> <span class="st">&quot;WLSMV&quot;</span>, <span class="at">rotation =</span> <span class="st">&quot;oblimin&quot;</span>),</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="at">fit_config =</span> <span class="fu">list</span>(<span class="at">targets =</span> <span class="fu">list</span>(<span class="at">rmsea =</span> <span class="fl">0.06</span>, <span class="at">srmr =</span> <span class="fl">0.06</span>, <span class="at">cfi =</span> <span class="fl">0.95</span>)),</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="at">use_global =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="at">global_opt =</span> <span class="fu">list</span>(<span class="at">max_drop =</span> <span class="dv">2</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="with-ai-analysis" class="section level3">
 <h3>With AI Analysis</h3>
+<p>The default model is <code>claude-haiku-5-5</code> and needs an
+Anthropic API key. Each item is sent with the definition you
+provide.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">efa_boosting</span>(</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>  <span class="at">data =</span> Data_Personality,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;item&quot;</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">5</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">use_gpt =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">gpt_model =</span> <span class="st">&quot;gpt-4o-mini&quot;</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="cn">TRUE</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co"># Print AI analysis</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="fu">print_conceptual_analysis</span>(result<span class="sc">$</span>conceptual_analysis)</span></code></pre></div>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>  <span class="at">name_items =</span> <span class="st">&quot;PPTQ&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="at">n_factors =</span> <span class="dv">3</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  <span class="at">use_ai_analysis =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">ai_config =</span> <span class="fu">list</span>(</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">api_key =</span> <span class="fu">Sys.getenv</span>(<span class="st">&quot;ANTHROPIC_API_KEY&quot;</span>),</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    <span class="at">language =</span> <span class="st">&quot;english&quot;</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    <span class="at">scale_title =</span> <span class="st">&quot;Scale title&quot;</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>    <span class="at">construct_definition =</span> <span class="st">&quot;Definition of the construct&quot;</span>,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    <span class="at">item_definitions =</span> <span class="fu">list</span>(<span class="at">PPTQ1 =</span> <span class="st">&quot;Wording of item 1&quot;</span>, <span class="at">PPTQ2 =</span> <span class="st">&quot;Wording of item 2&quot;</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>  )</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>)</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co"># Print AI analysis</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="fu">print_conceptual_analysis</span>(result<span class="sc">$</span>conceptual_analysis)</span></code></pre></div>
 </div>
 </div>
-<div id="parameters" class="section level2">
-<h2>Parameters</h2>
-<table>
+<div id="main-parameters" class="section level2">
+<h2>Main Parameters</h2>
+<table style="width:100%;">
+<colgroup>
+<col width="33%" />
+<col width="27%" />
+<col width="39%" />
+</colgroup>
 <thead>
 <tr class="header">
 <th>Parameter</th>
@@ -470,56 +479,46 @@ iterations exceeded - No improvement possible</p>
 </tr>
 <tr class="odd">
 <td><code>n_factors</code></td>
-<td>-</td>
+<td>3</td>
 <td>Number of factors to extract</td>
 </tr>
 <tr class="even">
-<td><code>rotation</code></td>
-<td>“oblimin”</td>
-<td>Rotation method</td>
-</tr>
-<tr class="odd">
-<td><code>target_RMSEA</code></td>
-<td>0.06</td>
-<td>Target RMSEA value</td>
-</tr>
-<tr class="even">
-<td><code>target_SRMR</code></td>
-<td>0.06</td>
-<td>Target SRMR value</td>
-</tr>
-<tr class="odd">
-<td><code>target_CFI</code></td>
-<td>0.95</td>
-<td>Target CFI value</td>
-</tr>
-<tr class="even">
-<td><code>min_loading</code></td>
-<td>0.40</td>
+<td><code>thresholds$loading</code></td>
+<td>0.30</td>
 <td>Minimum acceptable loading</td>
 </tr>
 <tr class="odd">
-<td><code>cross_loading_threshold</code></td>
-<td>0.32</td>
-<td>Cross-loading threshold</td>
-</tr>
-<tr class="even">
-<td><code>min_items_per_factor</code></td>
+<td><code>thresholds$min_items_per_factor</code></td>
 <td>3</td>
 <td>Minimum items per factor</td>
 </tr>
+<tr class="even">
+<td><code>thresholds$min_omega</code></td>
+<td>NULL</td>
+<td>Reliability floor per factor</td>
+</tr>
 <tr class="odd">
-<td><code>global_search</code></td>
+<td><code>model_config$rotation</code></td>
+<td>“oblimin”</td>
+<td>Rotation method</td>
+</tr>
+<tr class="even">
+<td><code>fit_config$targets</code></td>
+<td>RMSEA .08, SRMR .06, CFI .95</td>
+<td>Fit targets</td>
+</tr>
+<tr class="odd">
+<td><code>use_global</code></td>
 <td>FALSE</td>
 <td>Enable global search</td>
 </tr>
 <tr class="even">
-<td><code>global_max_remove</code></td>
+<td><code>global_opt$max_drop</code></td>
 <td>2</td>
-<td>Max items in global search</td>
+<td>Max items removed at once in global search</td>
 </tr>
 <tr class="odd">
-<td><code>use_gpt</code></td>
+<td><code>use_ai_analysis</code></td>
 <td>FALSE</td>
 <td>Enable AI analysis</td>
 </tr>
@@ -533,12 +532,14 @@ iterations exceeded - No improvement possible</p>
 </div>
 <div id="output" class="section level2">
 <h2>Output</h2>
-<p>The function returns a list containing:</p>
+<p>The function returns a list containing, among others:</p>
 <ul>
-<li><code>final_structure</code>: Final factor loadings matrix</li>
-<li><code>fit_indices</code>: Final fit indices</li>
-<li><code>removed_items</code>: List of removed items with reasons</li>
-<li><code>iteration_history</code>: Details of each iteration</li>
+<li><code>final_structure</code>: Final factor loadings</li>
+<li><code>removed_items</code>: Items removed, in order</li>
+<li><code>steps_log</code>: Reason and fit at each removal</li>
+<li><code>stop_reason</code>: Why the search ended</li>
+<li><code>bondades_original</code>: Fit indices of the final model</li>
+<li><code>omega_final</code>: Reliability per factor</li>
 <li><code>conceptual_analysis</code>: AI analysis (if enabled)</li>
 </ul>
 </div>

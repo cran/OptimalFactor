@@ -13,7 +13,11 @@ cfa_boosting <- function(data,
                            # aunque los targets ya se cumplan.
                            enforce_loading = TRUE,
                            cross_loading = 0.30,
-                           enforce_simple_structure = TRUE
+                           enforce_simple_structure = TRUE,
+                           # "saris": la carga ajena se clasifica con la tabla de
+                           # Saris et al. (2009), con delta = cross_loading.
+                           # "epc": criterio de 1.6.0 (MI significativo y EPC >= umbral).
+                           cross_loading_method = "saris"
                          ),
                          # Configuración de modelo
                          model_config = list(
@@ -115,8 +119,12 @@ cfa_boosting <- function(data,
                               # otro factor. Se mide sobre el EPC estandarizado
                               # del indice de modificacion, no sobre el MI solo.
                               cross_loading = 0.30,
-                              enforce_simple_structure = TRUE)
+                              enforce_simple_structure = TRUE,
+                              # Tabla de Saris tambien para la carga ajena (1.7.0).
+                              cross_loading_method = "saris")
   thresholds <- modifyList(default_thresholds, thresholds)
+  thresholds$cross_loading_method <- match.arg(thresholds$cross_loading_method,
+                                               c("saris", "epc"))
 
   default_model_config <- list(estimator = "WLSMV", ordered = TRUE)
   model_config <- modifyList(default_model_config, model_config)
@@ -141,35 +149,47 @@ cfa_boosting <- function(data,
     cat("Loading m\u00EDnimo:", thresholds$loading, "\n")
     cat("MI framework: Saris-Satorra-van der Veld (delta=", mod_indices_config$delta,
         ", power>=", mod_indices_config$power_threshold,
-        ", alpha=", mod_indices_config$alpha, ")\n\n")
+        ", alpha=", mod_indices_config$alpha, ")\n")
+    cat("Cargas cruzadas:", if (identical(thresholds$cross_loading_method, "saris"))
+          paste0("tabla de Saris (delta = ", thresholds$cross_loading, ")")
+        else paste0("EPC >= ", thresholds$cross_loading), "\n\n")
   }
 
   # ───────────────── Parsear modelo inicial ─────────────────
   parse_model <- function(model_syntax) {
-    lines <- strsplit(model_syntax, "\n")[[1]]
-    lines <- trimws(lines)
-    lines <- lines[lines != "" & !grepl("^#", lines)]
+    lines   <- .of_model_lines(model_syntax)
+    is_fac  <- grepl("=~", lines, fixed = TRUE)
+    is_cov  <- !is_fac & grepl("~~", lines, fixed = TRUE)
+    ignored <- lines[!is_fac & !is_cov]
+    if (length(ignored))
+      warning("These lines of 'model' are not used by cfa_boosting(): ",
+              paste(ignored, collapse = "; "), call. = FALSE)
+    list(factors = .of_model_factors(lines), covs = lines[is_cov])
+  }
 
-    factors <- list()
-    covs <- character(0)
-
-    for (line in lines) {
-      if (grepl("=~", line)) {
-        parts <- strsplit(line, "=~")[[1]]
-        factor_name <- trimws(parts[1])
-        items_str <- trimws(parts[2])
-        items <- trimws(strsplit(items_str, "\\+")[[1]])
-        factors[[factor_name]] <- items
-      } else if (grepl("~~", line)) {
-        covs <- c(covs, line)
-      }
-    }
-
-    list(factors = factors, covs = covs)
+  # Covarianzas que siguen teniendo sentido: si uno de sus items ya se elimino,
+  # dejarla en la sintaxis lo devolveria al modelo como variable observada suelta.
+  item_name <- .of_item_name
+  initial_items <- unique(item_name(unlist(.of_model_factors(.of_model_lines(model)))))
+  live_covs <- function(covs, factors) {
+    gone <- setdiff(initial_items, item_name(unlist(factors)))
+    if (!length(gone) || !length(covs)) return(covs)
+    out <- vapply(covs, function(cv) {
+      sides <- strsplit(cv, "~~", fixed = TRUE)[[1]]
+      if (length(sides) != 2L) return(cv)
+      if (item_name(sides[1]) %in% gone) return(NA_character_)
+      terms <- trimws(strsplit(sides[2], "+", fixed = TRUE)[[1]])
+      keep  <- terms[!(item_name(terms) %in% gone)]
+      if (!length(keep)) return(NA_character_)
+      if (length(keep) == length(terms)) return(cv)
+      paste0(trimws(sides[1]), " ~~ ", paste(keep, collapse = " + "))
+    }, character(1), USE.NAMES = FALSE)
+    out[!is.na(out)]
   }
 
   # Reconstruir sintaxis del modelo
   build_model_syntax <- function(factors, covs = character(0)) {
+    covs <- live_covs(covs, factors)
     lines <- character(0)
     for (fname in names(factors)) {
       items <- factors[[fname]]
@@ -286,10 +306,16 @@ cfa_boosting <- function(data,
   # .053 y suben el CFI a .997).
   #
   # La deteccion es por indice de modificacion de la carga ausente, pero NO por
-  # significancia sola: se exige ademas que el cambio esperado del parametro
-  # estandarizado alcance el umbral de carga cruzada. Un MI significativo con un
-  # EPC de .05 es una carga cruzada irrelevante, y actuar sobre el seria
-  # justamente la capitalizacion del azar que se quiere evitar.
+  # significancia sola. Desde 1.7.0 cada carga ausente se clasifica con la misma
+  # tabla de Saris et al. (2009) que las covarianzas de error: con el MI y el EPC
+  # se calcula la potencia para detectar una carga de tamano delta =
+  # cross_loading, y el item sale solo si la decision es "m" (MI significativo con
+  # potencia baja) o "EPC:m" (potencia alta y EPC por encima de delta). Un MI
+  # significativo con potencia alta y EPC trivial es la sensibilidad al tamano de
+  # muestra, no un error, y actuar sobre el seria capitalizar el azar. Se usa el
+  # EPC estandarizado con un delta estandarizado: el ncp = MI * delta^2 / EPC^2 no
+  # cambia de escala si ambos estan en la misma metrica.
+  # cross_loading_method = "epc" vuelve al criterio de 1.6.0 (EPC >= umbral).
   get_cross_loading_items <- function(fit, factors) {
     c_alpha <- qchisq(1 - mod_indices_config$alpha, df = 1)
     mi <- tryCatch(modificationIndices(fit, sort. = TRUE, minimum.value = c_alpha),
@@ -304,13 +330,26 @@ cfa_boosting <- function(data,
     epc_col <- if ("sepc.all" %in% names(mi_load)) "sepc.all" else "epc"
     mi_load$magnitud <- abs(mi_load[[epc_col]])
     umbral <- thresholds$cross_loading %||% thresholds$loading
-    mi_load <- mi_load[is.finite(mi_load$magnitud) & mi_load$magnitud >= umbral, ,
-                       drop = FALSE]
+    mi_load <- mi_load[is.finite(mi_load$magnitud), , drop = FALSE]
+    if (!nrow(mi_load)) return(NULL)
+    if (identical(thresholds$cross_loading_method, "saris")) {
+      cl <- lapply(seq_len(nrow(mi_load)), function(i)
+        classify_restriction(mi_load$mi[i], mi_load[[epc_col]][i], delta = umbral,
+                             power_threshold = mod_indices_config$power_threshold,
+                             alpha = mod_indices_config$alpha))
+      mi_load$decision <- vapply(cl, `[[`, character(1), "decision")
+      mi_load$power_mi <- vapply(cl, function(z) as.numeric(z$power), numeric(1))
+      mi_load <- mi_load[mi_load$decision %in% c("m", "EPC:m"), , drop = FALSE]
+    } else {
+      mi_load$decision <- "EPC>=umbral"
+      mi_load$power_mi <- NA_real_
+      mi_load <- mi_load[mi_load$magnitud >= umbral, , drop = FALSE]
+    }
     if (!nrow(mi_load)) return(NULL)
 
     item_to_factor <- list()
     for (fname in names(factors))
-      for (item in factors[[fname]]) item_to_factor[[item]] <- fname
+      for (item in factors[[fname]]) item_to_factor[[item_name(item)]] <- fname
 
     # Solo items del modelo, y solo cargas hacia un factor que no es el suyo.
     keep <- vapply(seq_len(nrow(mi_load)), function(i) {
@@ -328,7 +367,9 @@ cfa_boosting <- function(data,
       out[[it]] <- list(factor = item_to_factor[[it]],
                         otro_factor = mi_load$lhs[i],
                         magnitud = mi_load$magnitud[i],
-                        mi = mi_load$mi[i])
+                        mi = mi_load$mi[i],
+                        decision = mi_load$decision[i],
+                        power = mi_load$power_mi[i])
     }
     out
   }
@@ -356,7 +397,7 @@ cfa_boosting <- function(data,
     item_to_factor <- list()
     for (fname in names(factors)) {
       for (item in factors[[fname]]) {
-        item_to_factor[[item]] <- fname
+        item_to_factor[[item_name(item)]] <- fname
       }
     }
 
@@ -478,6 +519,8 @@ cfa_boosting <- function(data,
   # Loop de optimización
   while (iteration < performance$max_iterations) {
     iteration <- iteration + 1
+    current_covs <- live_covs(current_covs, current_factors)
+    added_covs   <- live_covs(added_covs, current_factors)
 
     # Verificar si ya cumple targets
     targets_check <- meets_targets(current_indices)
@@ -520,7 +563,7 @@ cfa_boosting <- function(data,
       f_peor <- problematic[[peor]]$factor
 
       test_factors <- current_factors
-      test_factors[[f_peor]] <- setdiff(test_factors[[f_peor]], peor)
+      test_factors[[f_peor]] <- .of_drop_items(test_factors[[f_peor]], peor)
       test_syntax <- build_model_syntax(test_factors, current_covs)
       test_fit <- fit_cfa(test_syntax)
 
@@ -564,7 +607,7 @@ cfa_boosting <- function(data,
         info <- cruzados[[peor]]
 
         test_factors <- current_factors
-        test_factors[[info$factor]] <- setdiff(test_factors[[info$factor]], peor)
+        test_factors[[info$factor]] <- .of_drop_items(test_factors[[info$factor]], peor)
         test_syntax <- build_model_syntax(test_factors, current_covs)
         test_fit <- fit_cfa(test_syntax)
 
@@ -580,14 +623,19 @@ cfa_boosting <- function(data,
             step = iteration, action = "Remove Item (cross-loading)",
             detail = paste0("Eliminar ", peor, " (", info$factor,
                             "; carga cruzada en ", info$otro_factor,
-                            ", EPC=", fmt_num(info$magnitud), ")"),
+                            ", MI=", fmt_num(info$mi, 1),
+                            ", EPC=", fmt_num(info$magnitud),
+                            if (!is.na(info$power)) paste0(", Power=", fmt_num(info$power)),
+                            ", =>", info$decision, ")"),
             rmsea = current_indices$rmsea, cfi = current_indices$cfi,
             srmr = current_indices$srmr, loss = current_loss,
             stringsAsFactors = FALSE))
 
           if (verbose)
             cat("  -> Eliminado", peor, "por carga cruzada en", info$otro_factor,
-                "(EPC =", fmt_num(info$magnitud), ")\n")
+                "(MI =", fmt_num(info$mi, 1), ", EPC =", fmt_num(info$magnitud),
+                if (!is.na(info$power)) paste0(", Power = ", fmt_num(info$power)) else "",
+                ", =>", info$decision, ")\n")
           next
         }
       }
@@ -621,7 +669,7 @@ cfa_boosting <- function(data,
 
         # Crear modelo sin el item
         test_factors <- current_factors
-        test_factors[[factor_name]] <- setdiff(test_factors[[factor_name]], item)
+        test_factors[[factor_name]] <- .of_drop_items(test_factors[[factor_name]], item)
         test_syntax <- build_model_syntax(test_factors, current_covs)
 
         test_fit <- fit_cfa(test_syntax)
@@ -662,7 +710,7 @@ cfa_boosting <- function(data,
       item_to_factor <- list()
       for (fname in names(current_factors)) {
         for (item in current_factors[[fname]]) {
-          item_to_factor[[item]] <- fname
+          item_to_factor[[item_name(item)]] <- fname
         }
       }
 
@@ -721,7 +769,7 @@ cfa_boosting <- function(data,
         opt2_indices <- NULL
         if (!is.null(factor1) && length(current_factors[[factor1]]) > thresholds$min_items_per_factor) {
           test_factors <- current_factors
-          test_factors[[factor1]] <- setdiff(test_factors[[factor1]], item1)
+          test_factors[[factor1]] <- .of_drop_items(test_factors[[factor1]], item1)
           test_syntax <- build_model_syntax(test_factors, current_covs)
           test_fit <- fit_cfa(test_syntax)
 
@@ -757,7 +805,7 @@ cfa_boosting <- function(data,
         opt3_indices <- NULL
         if (!is.null(factor2) && length(current_factors[[factor2]]) > thresholds$min_items_per_factor) {
           test_factors <- current_factors
-          test_factors[[factor2]] <- setdiff(test_factors[[factor2]], item2)
+          test_factors[[factor2]] <- .of_drop_items(test_factors[[factor2]], item2)
           test_syntax <- build_model_syntax(test_factors, current_covs)
           test_fit <- fit_cfa(test_syntax)
 
@@ -800,15 +848,15 @@ cfa_boosting <- function(data,
           if (factor1 == factor2) {
             can_remove_both <- length(current_factors[[factor1]]) > thresholds$min_items_per_factor + 1
             if (can_remove_both) {
-              test_factors[[factor1]] <- setdiff(test_factors[[factor1]], c(item1, item2))
+              test_factors[[factor1]] <- .of_drop_items(test_factors[[factor1]], c(item1, item2))
             }
           } else {
             # Factores diferentes
             can_remove_both <- (length(current_factors[[factor1]]) > thresholds$min_items_per_factor &&
                                 length(current_factors[[factor2]]) > thresholds$min_items_per_factor)
             if (can_remove_both) {
-              test_factors[[factor1]] <- setdiff(test_factors[[factor1]], item1)
-              test_factors[[factor2]] <- setdiff(test_factors[[factor2]], item2)
+              test_factors[[factor1]] <- .of_drop_items(test_factors[[factor1]], item1)
+              test_factors[[factor2]] <- .of_drop_items(test_factors[[factor2]], item2)
             }
           }
 
@@ -861,7 +909,7 @@ cfa_boosting <- function(data,
 
     if (best_action == "remove_item") {
       # Eliminación por carga baja
-      current_factors[[best_factor]] <- setdiff(current_factors[[best_factor]], best_item)
+      current_factors[[best_factor]] <- .of_drop_items(current_factors[[best_factor]], best_item)
       removed_items <- c(removed_items, best_item)
       action_label <- "Remove Item (low loading)"
 
@@ -874,7 +922,7 @@ cfa_boosting <- function(data,
     } else if (best_action == "remove_cov_item") {
       # Eliminar un item en lugar de covarianza
       for (item_info in best_items_to_remove) {
-        current_factors[[item_info$factor]] <- setdiff(current_factors[[item_info$factor]], item_info$item)
+        current_factors[[item_info$factor]] <- .of_drop_items(current_factors[[item_info$factor]], item_info$item)
         removed_items <- c(removed_items, item_info$item)
       }
       action_label <- "Remove Item (instead of cov)"
@@ -882,7 +930,7 @@ cfa_boosting <- function(data,
     } else if (best_action == "remove_cov_items_both") {
       # Eliminar ambos items en lugar de covarianza
       for (item_info in best_items_to_remove) {
-        current_factors[[item_info$factor]] <- setdiff(current_factors[[item_info$factor]], item_info$item)
+        current_factors[[item_info$factor]] <- .of_drop_items(current_factors[[item_info$factor]], item_info$item)
         removed_items <- c(removed_items, item_info$item)
       }
       action_label <- "Remove Both Items (instead of cov)"
@@ -916,6 +964,8 @@ cfa_boosting <- function(data,
 
   # ───────────────── RESULTADOS FINALES ─────────────────
 
+  current_covs <- live_covs(current_covs, current_factors)
+  added_covs   <- live_covs(added_covs, current_factors)
   final_indices <- extract_fit(current_fit)
   final_targets <- meets_targets(final_indices)
 
